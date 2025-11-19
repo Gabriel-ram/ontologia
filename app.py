@@ -9,7 +9,6 @@ g.parse("reposteria.rdf", format="xml")
 
 NS = Namespace("http://www.semanticweb.org/ontologies/reposteria#")
 
-# Obtener subclases recursivamente
 def get_all_subclasses(cls):
     subclasses = set()
     for sub in g.subjects(RDFS.subClassOf, cls):
@@ -17,7 +16,6 @@ def get_all_subclasses(cls):
         subclasses |= get_all_subclasses(sub)
     return subclasses
 
-# Obtener superclases recursivamente
 def get_all_superclasses(cls):
     superclasses = set()
     for sup in g.objects(cls, RDFS.subClassOf):
@@ -25,7 +23,6 @@ def get_all_superclasses(cls):
         superclasses |= get_all_superclasses(sup)
     return superclasses
 
-# Obtener instancias de una clase (incluye subclases)
 def get_instances_of_class(cls):
     subclasses = {cls} | get_all_subclasses(cls)
     instances = set()

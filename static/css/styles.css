@@ -8,8 +8,8 @@
             font-family: 'Poppins', sans-serif;
             /* Imagen de fondo con degradado encima */
             background: linear-gradient(
-                            rgba(233, 209, 178, 0.726),  /* color semitransparente arriba */
-                            rgba(223, 211, 171, 0.671)   /* color semitransparente abajo */
+                            rgba(240, 222, 199, 0.452),  /* color semitransparente arriba */
+                            rgba(219, 213, 191, 0.425)   /* color semitransparente abajo */
                         ),
                         url('/static/Fondo2.jpg') no-repeat center center fixed;
             background-size: cover; /* la imagen cubre toda la pantalla */
@@ -21,7 +21,7 @@
 
         /* Header con imagen de fondo */
         .header {
-            background: #300606f1;
+            background: #584b32;
             background-size: cover;
             background-position: center;
             padding: 60px 20px;
