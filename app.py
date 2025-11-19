@@ -3,14 +3,13 @@ from rdflib import Graph, RDFS, RDF, Namespace, Literal
 
 app = Flask(__name__)
 
-# Carga de la ontología local
+# Cargar ontología
 g = Graph()
 g.parse("reposteria.rdf", format="xml")  # Ajusta el nombre de tu archivo RDF
 
-# Namespace principal
 NS = Namespace("http://www.semanticweb.org/ontologies/reposteria#")
 
-# Función para obtener subclases recursivamente
+# Obtener subclases recursivamente
 def get_all_subclasses(cls):
     subclasses = set()
     for sub in g.subjects(RDFS.subClassOf, cls):
@@ -18,34 +17,61 @@ def get_all_subclasses(cls):
         subclasses |= get_all_subclasses(sub)
     return subclasses
 
-# Función de búsqueda
-def search_products(term):
+# Obtener todas las superclases de una clase
+def get_all_superclasses(cls):
+    superclasses = set()
+    for sup in g.objects(cls, RDFS.subClassOf):
+        superclasses.add(sup)
+        superclasses |= get_all_superclasses(sup)
+    return superclasses
+
+# Buscar instancias según término
+def search_instances(term):
     term_lower = term.lower()
     results = []
-    product_classes = {NS.Producto} | get_all_subclasses(NS.Producto)
+    seen = set()
 
-    seen = set()  # Para no repetir instancias
+    # Iteramos sobre todas las instancias
+    for inst in g.subjects(RDF.type, None):
+        if inst in seen:
+            continue
 
-    for prod in g.subjects(RDF.type, None):
-        if prod in seen:
-            continue  # Ya procesada
+        # Nombre de la instancia
+        nombre = g.value(inst, NS.nombre)
+        inst_name = str(nombre) if nombre else inst.split("#")[-1]
 
-        if any((prod, RDF.type, cls) in g for cls in product_classes):
-            nombre = g.value(prod, NS.nombre)
-            if nombre and term_lower in str(nombre).lower():
-                ingredientes = list({str(i).split("#")[-1] for i in g.objects(prod, NS.tieneIngrediente)})
-                tecnicas = list({str(t).split("#")[-1] for t in g.objects(prod, NS.requiereTecnica)})
-                herramientas = list({str(h).split("#")[-1] for h in g.objects(prod, NS.usaHerramienta)})
+        if term_lower in inst_name.lower():
+            # Obtener clases de la instancia
+            clases = [cls.split("#")[-1] for cls in g.objects(inst, RDF.type)]
+            
+            # Obtener superclases
+            superclases = []
+            for cls_uri in g.objects(inst, RDF.type):
+                superclases += [str(s.split("#")[-1]) for s in get_all_superclasses(cls_uri)]
+            
+            # Obtener propiedades principales
+            propiedades = {}
+            for prop in [NS.tieneIngrediente, NS.requiereTecnica, NS.usaHerramienta]:
+                objetos = [str(o.split("#")[-1]) for o in g.objects(inst, prop)]
+                if objetos:
+                    propiedades[prop.split("#")[-1]] = objetos
 
-                results.append({
-                    "nombre": str(nombre),
-                    "ingredientes": ingredientes,
-                    "tecnicas": tecnicas,
-                    "herramientas": herramientas
-                })
-                seen.add(prod)  # Marcamos como procesada
+            # Buscar si esta instancia es usada en otras
+            usada_en = []
+            for s, p, o in g:
+                if str(o) == str(inst):
+                    usada_en.append(str(s).split("#")[-1])
+
+            results.append({
+                "nombre": inst_name,
+                "clases": clases,
+                "superclases": list(set(superclases)),
+                "propiedades": propiedades,
+                "usada_en": list(set(usada_en))
+            })
+            seen.add(inst)
+
     return results
-
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -53,7 +79,7 @@ def index():
     term = ""
     if request.method == "POST":
         term = request.form.get("term", "")
-        results = search_products(term) if term else []
+        results = search_instances(term) if term else []
     return render_template("index.html", results=results, term=term)
 
 if __name__ == "__main__":
