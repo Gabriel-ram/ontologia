@@ -23,4 +23,3 @@ Cómo poblar la ontología (ejemplo):
 
 Notas:
 - El script populate_ontology.py realiza consultas SPARQL a DBpedia y requiere conexión a internet.
-- La ontología reposteria.owl es un punto de partida; puedes editarla con Protégé y añadir nuevas propiedades/clases según necesites.
