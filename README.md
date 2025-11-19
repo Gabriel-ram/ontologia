@@ -5,12 +5,11 @@ Contenido del repositorio:
 - app.py               -> Aplicación Flask que consulta DBpedia y muestra resultados.
 - templates/index.html -> Página de búsqueda.
 - templates/results.html-> Página de resultados.
-- reposteria.owl       -> Ontología OWL básica (clases y propiedades).
-- populate_ontology.py -> Script para poblar la ontología local con datos de DBpedia.
+- reposteria.rdf      -> Ontología OWL básica (clases y propiedades).
 - README.md            -> Este archivo.
 
 Requisitos:
-  pip install Flask SPARQLWrapper rdflib
+  pip install flask rdflib
 
 Cómo ejecutar la app (local):
   1. Activar un entorno virtual (recomendado).
