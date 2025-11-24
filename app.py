@@ -46,98 +46,117 @@ def search_instances(term):
         nombre = g.value(inst, NS.nombre)
         inst_name = str(nombre) if nombre else inst.split("#")[-1]
 
+        match = False
+
+        # Buscar en nombre
         if term_lower in inst_name.lower():
+            match = True
 
-            # ---------------------------
-            # Clases y superclases
-            # ---------------------------
-            clases = [cls.split("#")[-1] for cls in g.objects(inst, RDF.type)]
-
-            superclases = []
-            for cls_uri in g.objects(inst, RDF.type):
-                superclases += [str(s.split("#")[-1]) for s in get_all_superclasses(cls_uri)]
-
-            clases_uris = list(g.objects(inst, RDF.type))
-            es_producto = False
-            for cls_uri in clases_uris:
-                cls_name = cls_uri.split("#")[-1].lower()
-                if cls_name == "producto":
-                    es_producto = True
-                    break
-                # Verificar si Producto está en las superclases
-                superclases_names = [s.split("#")[-1].lower() for s in get_all_superclasses(cls_uri)]
-                if "producto" in superclases_names:
-                    es_producto = True
-                    break
-
-            # ---------------------------
-            # SEPARACIÓN DE ATRIBUTOS
-            # ---------------------------
-
-            ingredientes = []
-            herramientas = []
-            tecnicas = []
-            atributos = {}
-
+        # Buscar en atributos literales
+        if not match:
             for prop, obj in g.predicate_objects(inst):
+                if isinstance(obj, Literal) and term_lower in str(obj).lower():
+                    match = True
+                    break
 
-                prop_name = prop.split("#")[-1]
+        # Buscar en ingredientes / herramientas / técnicas
+        if not match:
+            for prop, obj in g.predicate_objects(inst):
+                if not isinstance(obj, Literal):
+                    obj_name = obj.split("#")[-1].lower()
+                    if term_lower in obj_name:
+                        match = True
+                        break
 
-                # IGNORAR rdf:type
-                if prop == RDF.type:
-                    continue
+        # Buscar en clases asociadas
+        if not match:
+            for cls_uri in g.objects(inst, RDF.type):
+                cls_name = cls_uri.split("#")[-1].lower()
+                if term_lower in cls_name:
+                    match = True
+                    break
 
-                if es_producto:
-                    # --- Ingredientes ---
-                    if prop == NS.tieneIngrediente or prop_name.lower().startswith("ingrediente"):
-                        ingredientes.append(obj.split("#")[-1])
-                        continue
+        # Si no hubo match, saltar esta instancia
+        if not match:
+            continue
 
-                    # --- Herramientas ---
-                    if prop == NS.usaHerramienta or prop_name.lower().startswith("herramienta"):
-                        herramientas.append(obj.split("#")[-1])
-                        continue
+        # ======================================================
+        # TU CÓDIGO ORIGINAL CONTINÚA IGUAL
+        # ======================================================
 
-                    # --- Técnicas ---
-                    if prop == NS.requiereTecnica or prop_name.lower().startswith("tecnica"):
-                        tecnicas.append(obj.split("#")[-1])
-                        continue
+        # Clases y superclases
+        clases = [cls.split("#")[-1] for cls in g.objects(inst, RDF.type)]
 
-                # --- Literal (los valores numéricos o texto) ---
-                if isinstance(obj, Literal):
-                    atributos.setdefault(prop_name, []).append(str(obj))
-                    continue
+        superclases = []
+        for cls_uri in g.objects(inst, RDF.type):
+            superclases += [str(s.split("#")[-1]) for s in get_all_superclasses(cls_uri)]
 
-                # Para no-Productos, incluir todas las propiedades que no sean literales
-                if not es_producto:
-                    if not isinstance(obj, Literal):
-                        atributos.setdefault(prop_name, []).append(obj.split("#")[-1])
+        clases_uris = list(g.objects(inst, RDF.type))
+        es_producto = False
+        for cls_uri in clases_uris:
+            cls_name = cls_uri.split("#")[-1].lower()
+            if cls_name == "producto":
+                es_producto = True
+                break
+            superclases_names = [s.split("#")[-1].lower() for s in get_all_superclasses(cls_uri)]
+            if "producto" in superclases_names:
+                es_producto = True
+                break
+
+        ingredientes = []
+        herramientas = []
+        tecnicas = []
+        atributos = {}
+
+        for prop, obj in g.predicate_objects(inst):
+            prop_name = prop.split("#")[-1]
+
+            if prop == RDF.type:
                 continue
 
-            # ---------------------------
-            # ¿Es usada por otras instancias?
-            # ---------------------------
-            usada_en = []
-            for s, p, o in g:
-                if str(o) == str(inst):
-                    usada_en.append(str(s).split("#")[-1])
+            if es_producto:
+                if prop == NS.tieneIngrediente or prop_name.lower().startswith("ingrediente"):
+                    ingredientes.append(obj.split("#")[-1])
+                    continue
 
-            results.append({
-                "tipo": "instancia",
-                "nombre": inst_name,
-                "clases": clases,
-                "superclases": list(set(superclases)),
-                "es_producto": es_producto,
-                "ingredientes": ingredientes if es_producto else [],
-                "herramientas": herramientas if es_producto else [],
-                "tecnicas": tecnicas if es_producto else [],
-                "atributos": atributos,
-                "usada_en": list(set(usada_en))
-            })
+                if prop == NS.usaHerramienta or prop_name.lower().startswith("herramienta"):
+                    herramientas.append(obj.split("#")[-1])
+                    continue
 
-            seen.add(inst)
+                if prop == NS.requiereTecnica or prop_name.lower().startswith("tecnica"):
+                    tecnicas.append(obj.split("#")[-1])
+                    continue
+
+            if isinstance(obj, Literal):
+                atributos.setdefault(prop_name, []).append(str(obj))
+                continue
+
+            if not es_producto:
+                if not isinstance(obj, Literal):
+                    atributos.setdefault(prop_name, []).append(obj.split("#")[-1])
+
+        usada_en = []
+        for s, p, o in g:
+            if str(o) == str(inst):
+                usada_en.append(str(s).split("#")[-1])
+
+        results.append({
+            "tipo": "instancia",
+            "nombre": inst_name,
+            "clases": clases,
+            "superclases": list(set(superclases)),
+            "es_producto": es_producto,
+            "ingredientes": ingredientes if es_producto else [],
+            "herramientas": herramientas if es_producto else [],
+            "tecnicas": tecnicas if es_producto else [],
+            "atributos": atributos,
+            "usada_en": list(set(usada_en))
+        })
+
+        seen.add(inst)
 
     return results
+
 
 # -----------------------------------------------
 # 🔍 BÚSQUEDA DE CLASES
