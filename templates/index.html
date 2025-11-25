@@ -2,31 +2,105 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Buscador de Repostería</title>
+    <title>Buscador de Repostería - Local + DBpedia</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- CSS EXTERNO -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        /* Estilos adicionales para diferenciar fuentes */
+        .source-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        
+        .source-local {
+            background: #C8E6C9;
+            color: #2E7D32;
+        }
+        
+        .source-dbpedia {
+            background: #BBDEFB;
+            color: #1565C0;
+        }
+        
+        .card.dbpedia-result {
+            border-left: 4px solid #2196F3;
+        }
+        
+        .card.local-result {
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #F5F5F5;
+            border-radius: 8px;
+        }
+        
+        .section-header h2 {
+            margin: 0;
+            color: #424242;
+            font-size: 1.2em;
+        }
+        
+        .results-count {
+            color: #757575;
+            font-size: 0.9em;
+        }
+        
+        .dbpedia-link {
+            color: #1565C0;
+            text-decoration: none;
+            font-size: 0.85em;
+            word-break: break-all;
+        }
+        
+        .dbpedia-link:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
-    <!-- Header con buscador -->
     <div class="header">
-        <h1>Buscador de Repostería</h1>
+        <h1>🍰 Buscador de Repostería</h1>
+        <p style="color: #E8DFD6; margin-bottom: 20px; font-size: 0.95em;">
+            Búsqueda en ontología local + DBpedia
+        </p>
         
         <form method="POST" class="search-container">
-            <input type="text" name="term" placeholder="Busca brownies, pasteles, chocolate..." value="{{ term }}">
+            <input type="text" name="term" placeholder="Busca brownies, pasteles, chocolate, ingredientes..." value="{{ term }}">
             <button type="submit">🔍 Buscar</button>
         </form>
     </div>
 
-    <!-- Resultados -->
     <div class="results-container">
         {% if results %}
+            {% set local_results = results | selectattr('fuente', 'equalto', 'local') | list %}
+            {% set dbpedia_results = results | selectattr('fuente', 'equalto', 'dbpedia') | list %}
+            
+            <!-- Resultados Locales -->
+            {% if local_results %}
+            <div class="section-header">
+                <h2>Resultados de tu Ontología Local</h2>
+                <span class="results-count">{{ local_results|length }} resultado(s)</span>
+            </div>
+            
             <div class="results-grid">
-                {% for item in results %}
-                    <div class="card">
+                {% for item in local_results %}
+                    <div class="card local-result">
                         <div class="card-header">
-                            <h3>{{ item.nombre }}</h3>
+                            <h3>
+                                {{ item.nombre }}
+                                <span class="source-badge source-local">LOCAL</span>
+                            </h3>
                         </div>
 
                         {% if item.clases %}
@@ -113,9 +187,92 @@
                     </div>
                 {% endfor %}
             </div>
+            {% endif %}
+
+            <!-- Resultados de DBpedia -->
+            {% if dbpedia_results %}
+            <div class="section-header" style="margin-top: 40px;">
+                <h2>Resultados desde DBpedia</h2>
+                <span class="results-count">{{ dbpedia_results|length }} resultado(s)</span>
+            </div>
+            
+            <div class="results-grid">
+                {% for item in dbpedia_results %}
+                    <div class="card dbpedia-result">
+                        <div class="card-header">
+                            <h3>
+                                {{ item.nombre }}
+                                <span class="source-badge source-dbpedia">DBPEDIA</span>
+                            </h3>
+                        </div>
+
+                        {% if item.clases %}
+                        <div class="card-section">
+                            <div class="section-title">Tipo</div>
+                            <div class="tag-container">
+                                {% for clase in item.clases %}
+                                    <span class="tag">{{ clase }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if item.ingredientes %}
+                        <div class="card-section">
+                            <div class="section-title">Ingredientes (DBpedia)</div>
+                            <ul>
+                                {% for ing in item.ingredientes[:8] %}
+                                    <li>{{ ing }}</li>
+                                {% endfor %}
+                                {% if item.ingredientes|length > 8 %}
+                                    <li style="color: #999; font-style: italic;">...y {{ item.ingredientes|length - 8 }} más</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        {% if item.atributos %}
+                        <div class="card-section">
+                            <div class="section-title">Información</div>
+                            <div class="attributes-grid">
+                                {% for key, values in item.atributos.items() %}
+                                    {% if key != 'dbpedia_uri' %}
+                                    <div class="attribute-item">
+                                        <div class="attribute-key">{{ key }}</div>
+                                        <div class="attribute-values">{{ values|join(', ') }}</div>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if item.atributos.dbpedia_uri %}
+                                <div class="attribute-item">
+                                    <div class="attribute-key">🔗 Ver en DBpedia</div>
+                                    <div class="attribute-values">
+                                        <a href="{{ item.atributos.dbpedia_uri[0] }}" 
+                                           target="_blank" 
+                                           class="dbpedia-link">
+                                            {{ item.atributos.dbpedia_uri[0] }}
+                                        </a>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if not local_results and not dbpedia_results %}
+            <div class="no-results">
+                <p>🔍 No se encontraron resultados en ninguna fuente</p>
+            </div>
+            {% endif %}
+
         {% else %}
             <div class="no-results">
-                <p>🔍 No se encontraron resultados</p>
+                <p> Realiza una búsqueda para ver resultados</p>
             </div>
         {% endif %}
     </div>
