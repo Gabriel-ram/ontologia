@@ -37,7 +37,7 @@ def get_instances_of_class(cls):
     return list(instances)
 
 # -----------------------------------------------
-# BÚSQUEDA LOCAL (tu código original)
+# BÚSQUEDA LOCAL
 # -----------------------------------------------
 def search_instances(term):
     term_lower = term.lower()
@@ -146,7 +146,7 @@ def search_instances(term):
             "tecnicas": tecnicas if es_producto else [],
             "atributos": atributos,
             "usada_en": list(set(usada_en)),
-            "fuente": "local"  # Marcador de fuente
+            "fuente": "local"
         })
 
         seen.add(inst)
@@ -187,11 +187,11 @@ def search_classes(term):
 
 
 # -----------------------------------------------
-# BÚSQUEDA EN DBPEDIA
+# BUSQUEDA EN DBPEDIA
 # -----------------------------------------------
 def search_dbpedia_food(term):
     """
-    Busca recetas, postres, ingredientes relacionados con repostería en DBpedia
+    Busca SOLO comidas en DBpedia
     """
     results = []
     
@@ -219,24 +219,20 @@ def search_dbpedia_food(term):
         
         search_term = term_translations.get(term.lower(), term)
         
-        # Consulta SPARQL simplificada
+        # Consulta SPARQL - traemos solo foods y con su fotito
         query = f"""
         PREFIX dbo: <http://dbpedia.org/ontology/>
         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
         
-        SELECT DISTINCT ?item ?label
+        SELECT DISTINCT ?item ?label ?thumbnail
         WHERE {{
             ?item rdfs:label ?label .
+            ?item a dbo:Food .
+            
             FILTER(LANG(?label) = "en")
             FILTER(CONTAINS(LCASE(?label), LCASE("{search_term}")))
-           
-            {{
-                ?item a dbo:Food .
-            }}
-            UNION
-            {{
-                ?item a dbo:Ingredient .
-            }}
+            
+            OPTIONAL {{ ?item dbo:thumbnail ?thumbnail . }}
         }}
         LIMIT 8
         """
@@ -255,12 +251,14 @@ def search_dbpedia_food(term):
             processed_items.add(item_uri)
             
             label = result.get("label", {}).get("value", item_uri.split("/")[-1])
+            thumbnail_url = result.get("thumbnail", {}).get("value", None)
             
             print(f"\n{'='*60}")
             print(f"Procesando: {label}")
             print(f"URI: {item_uri}")
+            print(f"Thumbnail: {thumbnail_url}")
             
-            # ===== CONSULTA CORREGIDA - UNION dentro del WHERE =====
+            # ===== CONSULTA CORREGIDA - Incluye dbo:description =====
             abstract = "Descripción no disponible en DBpedia"
             try:
                 abstract_query = f"""
@@ -299,7 +297,7 @@ def search_dbpedia_food(term):
                     print(f"✗ No se encontró ninguna descripción")
                     
             except Exception as e:
-                print(f"✗ Error: {str(e)}")
+                print(f"✗ Error obteniendo descripción: {str(e)}")
                 abstract = "Descripción no disponible en DBpedia"
             
             # Limitar el abstract a 400 caracteres
@@ -331,8 +329,8 @@ def search_dbpedia_food(term):
                         ingredientes.append(ing_name)
                         
                 print(f"Ingredientes: {len(ingredientes)}")
-            except:
-                pass
+            except Exception as e:
+                print(f"Error obteniendo ingredientes: {e}")
             
             # Buscar país de origen y región
             pais_origen = None
@@ -376,8 +374,8 @@ def search_dbpedia_food(term):
                         pais_origen = loc_data["countryLabel"]["value"]
                     if "regionLabel" in loc_data:
                         region = loc_data["regionLabel"]["value"]
-            except:
-                pass
+            except Exception as e:
+                print(f"Error obteniendo ubicación: {e}")
             
             # Construir atributos
             atributos = {
@@ -403,6 +401,7 @@ def search_dbpedia_food(term):
                 "tecnicas": [],
                 "atributos": atributos,
                 "usada_en": [],
+                "thumbnail": thumbnail_url,
                 "fuente": "dbpedia"
             })
         
@@ -410,78 +409,8 @@ def search_dbpedia_food(term):
         print(f"Error consultando DBpedia: {e}")
     
     return results
-
-def search_dbpedia_ingredients(term):
-    """
-    Busca ingredientes específicos en DBpedia
-    """
-    results = []
-    
-    try:
-        sparql = SPARQLWrapper(DBPEDIA_ENDPOINT)
-        sparql.setTimeout(10)
-        
-        query = f"""
-        PREFIX dbo: <http://dbpedia.org/ontology/>
-        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        
-        SELECT DISTINCT ?item ?label ?abstract ?type
-        WHERE {{
-            {{
-                ?item a dbo:Ingredient .
-                ?item rdfs:label ?label .
-                FILTER(LANG(?label) = "en")
-                FILTER(CONTAINS(LCASE(?label), LCASE("{term}")))
-            }}
-            UNION
-            {{
-                ?item rdfs:label ?label .
-                ?item a ?type .
-                FILTER(LANG(?label) = "en")
-                FILTER(CONTAINS(LCASE(?label), LCASE("{term}")))
-                FILTER(?type = dbo:Food || ?type = dbo:Ingredient)
-            }}
-            
-            OPTIONAL {{ ?item dbo:abstract ?abstract . FILTER(LANG(?abstract) = "en") }}
-        }}
-        LIMIT 5
-        """
-        
-        sparql.setQuery(query)
-        sparql.setReturnFormat(JSON)
-        query_results = sparql.query().convert()
-        
-        for result in query_results["results"]["bindings"]:
-            label = result.get("label", {}).get("value", "")
-            abstract = result.get("abstract", {}).get("value", "Sin descripción")
-            
-            if len(abstract) > 300:
-                abstract = abstract[:297] + "..."
-            
-            results.append({
-                "tipo": "instancia",
-                "nombre": label,
-                "clases": ["Ingredient (DBpedia)"],
-                "superclases": [],
-                "es_producto": False,
-                "ingredientes": [],
-                "herramientas": [],
-                "tecnicas": [],
-                "atributos": {
-                    "descripcion": [abstract]
-                },
-                "usada_en": [],
-                "fuente": "dbpedia"
-            })
-    
-    except Exception as e:
-        print(f"Error consultando DBpedia ingredientes: {e}")
-    
-    return results
-
-
 # -----------------------------------------------
-# 🔍 CONTROLADOR PRINCIPAL
+# CONTROLADOR PRINCIPAL
 # -----------------------------------------------
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -497,18 +426,17 @@ def index():
             class_res = search_classes(term)
             local_results = inst_res + class_res
             
-            # 2. Buscar en DBpedia (siempre para enriquecer)
+            # 2. Buscar en DBpedia (solo Food)
             dbpedia_food_results = search_dbpedia_food(term)
-            dbpedia_ingredient_results = search_dbpedia_ingredients(term)
             
             # 3. Combinar resultados: primero locales, luego DBpedia
-            results = local_results + dbpedia_food_results + dbpedia_ingredient_results
+            results = local_results + dbpedia_food_results
             
-            # Si no hay resultados locales, asegurar que al menos haya algo de DBpedia
-            if not local_results and not dbpedia_food_results:
+            # Si no hay resultados, mostrar mensaje
+            if not results:
                 results.append({
                     "tipo": "mensaje",
-                    "nombre": f"No se encontraron resultados locales para '{term}'",
+                    "nombre": f"No se encontraron resultados para '{term}'",
                     "fuente": "sistema"
                 })
 

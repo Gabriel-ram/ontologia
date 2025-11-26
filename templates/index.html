@@ -66,15 +66,38 @@
         .dbpedia-link:hover {
             text-decoration: underline;
         }
+        
+        /* NUEVO: Estilos para la imagen thumbnail */
+        .thumbnail-container {
+            width: 100%;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #F5F5F5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 150px;
+        }
+        
+        .thumbnail-container img {
+            width: 100%;
+            height: auto;
+            max-height: 200px;
+            object-fit: cover;
+        }
+        
+        .no-thumbnail {
+            color: #999;
+            font-style: italic;
+            padding: 20px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>🍰 Buscador de Repostería</h1>
-        <p style="color: #E8DFD6; margin-bottom: 20px; font-size: 0.95em;">
-            Búsqueda en ontología local + DBpedia
-        </p>
-        
         <form method="POST" class="search-container">
             <input type="text" name="term" placeholder="Busca brownies, pasteles, chocolate, ingredientes..." value="{{ term }}">
             <button type="submit">🔍 Buscar</button>
@@ -204,6 +227,15 @@
                                 {{ item.nombre }}
                                 <span class="source-badge source-dbpedia">DBPEDIA</span>
                             </h3>
+                        </div>
+
+                        <!-- NUEVO: Mostrar imagen thumbnail primero -->
+                        <div class="thumbnail-container">
+                            {% if item.thumbnail %}
+                                <img src="{{ item.thumbnail }}" alt="{{ item.nombre }}" onerror="this.parentElement.innerHTML='<div class=\'no-thumbnail\'>🖼️ Imagen no disponible</div>'">
+                            {% else %}
+                                <div class="no-thumbnail">🖼️ Sin imagen disponible</div>
+                            {% endif %}
                         </div>
 
                         {% if item.clases %}
